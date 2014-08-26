@@ -1,0 +1,72 @@
+#!/bin/bash
+clear
+
+#
+# command to get the file to your server
+# wget --no-check-certificate https://raw.github.com/Chlorel/rtInst/master/rtInst
+# chmod +x ./rtInst
+# ./rtInst
+#
+
+# Checking if user is root.
+
+if [ "$(id -u)" != "0" ]; then
+	echo
+	echo "This script must be run as root." 1>&2
+	echo
+	exit 1
+fi
+
+echo
+echo "Is the OS on this server Debian 7 ? If not, quit or continue at own risk."
+echo
+read -p "Press [Enter] to continue..." -n 1
+echo
+
+# Prompting for system user.
+
+con=0
+while [ $con -eq 0 ]; do
+
+        echo -n "Please type a valid system user: "
+        read -e user
+        uid=$(cat /etc/passwd | grep "$user": | cut -d: -f3)
+
+        if [ -z $(cat /etc/passwd | grep "$user":) ]; then
+                echo
+                echo "This user does not exist!"
+
+        elif [ $uid -lt 999 ]; then
+                echo
+                echo "That user's UID is too low!"
+
+        elif [ $user == nobody ]; then
+                echo
+                echo "You cant use 'nobody' as user!"
+        else
+                con=1
+        fi
+done
+
+homedir=$(cat /etc/passwd | grep "$user": | cut -d: -f6)
+
+
+# Installing mediastream plugins
+
+cd /var/www/rutorrent/plugins/
+svn co -q http://svn.rutorrent.org/svn/filemanager/trunk/mediastream
+
+mkdir -p /"$homedir"/public_html/
+mkdir -p /"$homedir"/public_html/stream/
+
+ln -s /var/www/rutorrent/plugins/mediastream/view.php /"$homedir"/public_html/stream/view.php
+chown www-data: /"$homedir"/public_html/stream
+chown www-data: /"$homedir"/public_html/stream/view.php
+
+ip=$(ip addr | grep eth0 | grep inet | awk '{print $2}' | cut -d/ -f1)
+
+streampath=$ip"/~"$user
+
+sed -i "s/mydomain.com/$streampath/g" /var/www/rutorrent/plugins/mediastream/conf.php
+
+echo "Chlorel - Chromosome"
